@@ -1,0 +1,108 @@
+Target http://10.62.32.150:30080/api/info | concurrency 10 | 200 req/s max | 90s
+ sec     ok   err  versions / errors
+   0      0     0  
+   1      0   135    !! HTTP 503=135 <-- ERRORS
+   2     28   146  v1=28  !! HTTP 503=146 <-- ERRORS
+   3     56   122  v1=56  !! HTTP 503=122 <-- ERRORS
+   4     88   104  v1=88  !! HTTP 503=104 <-- ERRORS
+   5    199     0  v1=199
+   6    200     0  v1=200
+   7    200     0  v1=200
+   8    198     0  v1=198
+   9    203     0  v1=203
+     ==== 10.0s  EVENT START: kubectl delete pod $(kubectl get pods -l app=orders-api -o jsonpath="{.items[0].metadata.name}") && kubectl rollout status deployment/orders-api --timeout=300s ====
+  10    196     0  v1=196
+  11    192     3  v1=192  !! connection refused=3 <-- ERRORS
+     ==== 12.4s  EVENT DONE (ok) ====
+  12    136    66  v1=136  !! connection refused=66 <-- ERRORS
+  13    116    84  v1=116  !! connection refused=84 <-- ERRORS
+  14    125    75  v1=125  !! connection refused=75 <-- ERRORS
+  15    133    66  v1=133  !! connection refused=66 <-- ERRORS
+  16    138    61  v1=138  !! connection refused=61 <-- ERRORS
+  17    127    75  v1=127  !! connection refused=75 <-- ERRORS
+  18    129    64  v1=129  !! connection refused=64 <-- ERRORS
+  19     87    54  v1=87  !! connection refused=41, HTTP 503=13 <-- ERRORS
+  20    124    53  v1=124  !! HTTP 503=53 <-- ERRORS
+  21    133    58  v1=133  !! HTTP 503=58 <-- ERRORS
+  22    126    62  v1=126  !! HTTP 503=62 <-- ERRORS
+  23    129    60  v1=129  !! HTTP 503=60 <-- ERRORS
+  24    131    62  v1=131  !! HTTP 503=62 <-- ERRORS
+  25    120    64  v1=120  !! HTTP 503=64 <-- ERRORS
+  26    139    55  v1=139  !! HTTP 503=55 <-- ERRORS
+  27    134    58  v1=134  !! HTTP 503=58 <-- ERRORS
+  28    127    60  v1=127  !! HTTP 503=60 <-- ERRORS
+  29    126    66  v1=126  !! HTTP 503=66 <-- ERRORS
+  30    139    55  v1=139  !! HTTP 503=55 <-- ERRORS
+  31    127    65  v1=127  !! HTTP 503=65 <-- ERRORS
+  32    132    62  v1=132  !! HTTP 503=62 <-- ERRORS
+  33    135    56  v1=135  !! HTTP 503=56 <-- ERRORS
+  34    131    66  v1=131  !! HTTP 503=66 <-- ERRORS
+  35    201     0  v1=201
+  36    200     0  v1=200
+  37    200     0  v1=200
+  38    200     0  v1=200
+  39    200     0  v1=200
+  40    200     0  v1=200
+  41    200     0  v1=200
+  42    200     0  v1=200
+  43    200     0  v1=200
+  44    200     0  v1=200
+  45    200     0  v1=200
+  46    198     0  v1=198
+  47    202     0  v1=202
+  48    200     0  v1=200
+  49    200     0  v1=200
+  50    200     0  v1=200
+  51    200     0  v1=200
+  52    200     0  v1=200
+  53    200     0  v1=200
+  54    200     0  v1=200
+  55    200     0  v1=200
+  56    199     0  v1=199
+  57    201     0  v1=201
+  58    200     0  v1=200
+  59    200     0  v1=200
+  60    200     0  v1=200
+  61    200     0  v1=200
+  62    200     0  v1=200
+  63    200     0  v1=200
+  64    200     0  v1=200
+  65    200     0  v1=200
+  66    200     0  v1=200
+  67    200     0  v1=200
+  68    200     0  v1=200
+  69    200     0  v1=200
+  70    192     0  v1=192
+  71    208     0  v1=208
+  72    200     0  v1=200
+  73    200     0  v1=200
+  74    200     0  v1=200
+  75    200     0  v1=200
+  76    200     0  v1=200
+  77    200     0  v1=200
+  78    200     0  v1=200
+  79    200     0  v1=200
+  80    200     0  v1=200
+  81    200     0  v1=200
+  82    200     0  v1=200
+  83    200     0  v1=200
+  84    200     0  v1=200
+  85    200     0  v1=200
+  86    200     0  v1=200
+  87    200     0  v1=200
+  88    200     0  v1=200
+  89    200     0  v1=200
+  90     10     0  v1=10
+
+=== Summary ===
+requests       : 17472
+failed         : 1957 (11.20%)
+  HTTP 503            : 1422
+  connection refused  : 535
+seconds w/ err : 28 (from 1s to 34s)
+latency p50    : 3 ms
+latency p99    : 22 ms
+latency max    : 93 ms
+event          : 10.0s EVENT START: kubectl delete pod $(kubectl get pods -l app=orders-api -o jsonpath="{.items[0].metadata.name}") && kubectl rollout status deployment/orders-api --timeout=300s
+event          : 12.4s EVENT DONE (ok)
+raw data       : results/e5-naive.csv
