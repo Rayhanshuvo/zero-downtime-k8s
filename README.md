@@ -14,6 +14,8 @@
 
 The naive rollout was also the one Kubernetes reported as finished fastest: `kubectl rollout status` said *successfully rolled out* after 3.6 seconds, while the service stayed completely down for the next 30.
 
+The same settings also made a rollback (E4) and a pod crashing under load (E5) invisible to users: 0 failed requests, compared with 1,450 for a crashed pod in the default setup.
+
 **Stack:** Java 21 · Spring Boot 3 · Kubernetes · Docker · Nginx (L4) · Python load tester
 
 ---
@@ -152,86 +154,55 @@ No errors, no hangs, and v1 and v2 handed over traffic smoothly from second 35 u
 
 **Why the preStop sleep is needed:** when a pod starts terminating, two things happen in parallel: the kubelet sends SIGTERM to the container, and the endpoint controller removes the pod from the Service so kube-proxy stops routing to it. Nothing orders the two. Without a delay, the app can stop accepting connections while traffic is still being routed to it, which is exactly the connection refused/reset seen in E2. The 10-second `preStop` sleep makes sure routing is updated first; graceful shutdown then lets in-flight requests finish.
 
-#### E3b (optional): slow in-flight requests
+### E4: Rollback under load
 
-The same comparison with requests that take 2 seconds, so many are in progress when SIGTERM arrives:
-
-```bash
-make experiment STEP=2-readiness  NAME=e3b-before NODE=<node-ip> LOADARGS='--path "/api/work?ms=2000" --concurrency 50'
-make experiment STEP=3-production NAME=e3b-after  NODE=<node-ip> LOADARGS='--path "/api/work?ms=2000" --concurrency 50'
-```
-
-**Result:**
-
-| Configuration | Requests | Failed | Error types |
-|---|---|---|---|
-| Step 2 (readiness only) | _not run yet_ | | |
-| Step 3 (+ graceful shutdown + preStop) | _not run yet_ | | |
-
-### E4: Rollback
+The production setup is moved to v2, then rolled back to v1 at second 10 while the load test runs.
 
 ```bash
-make rollout-v2
-make history
-time make undo && kubectl rollout status deployment/orders-api
-kubectl get rs -l app=orders-api
+make deploy STEP=3-production && make rollout-v2 && kubectl rollout status deployment/orders-api
+python3 scripts/loadtest.py --url http://<node-ip>:30080 --duration 150 --name e4-rollback \
+  --event-at 10 \
+  --event-cmd "kubectl rollout undo deployment/orders-api && kubectl rollout status deployment/orders-api --timeout=300s"
 ```
 
-**Result:**
+**Hypothesis:** no errors, because a rollback is just another rolling update. But not instant, because every pod still has to start and warm up.
 
-| Metric | Value |
-|---|---|
-| Time from `undo` to all pods ready | |
-| New ReplicaSet created? | |
-| Failed requests during rollback | |
+**Result** ([raw output](results/e4-rollback.txt)):
 
-**Why:** _old ReplicaSet kept at 0 replicas; rollback is a scale operation, but every new pod still waits for warm-up._
+| Requests | Failed | First v1 response | Last v2 response | Rollback complete |
+|---|---|---|---|---|
+| 29,883 | **0** | 27 s after `undo` | 83 s after `undo` | **82.5 s** |
 
-### E5: Self-healing under load
+**Why:** `kubectl rollout undo` scales the previous ReplicaSet back up instead of creating a new one, but its pods are new pods: each one has to start the JVM, warm up and pass its readiness probe before the next old pod is removed. A rollback is safe, but it takes as long as a release. Knowing that number in advance matters during an incident: "roll back" means about a minute and a half for this service, not a few seconds.
+
+### E5: A pod dies under load
+
+At second 10 one pod is deleted while traffic flows, simulating a crashed or evicted pod. Run once with each setup.
 
 ```bash
-make load NODE=<node-ip> NAME=e5-<step>
-make kill-pod      # after ~10s
+python3 scripts/loadtest.py --url http://<node-ip>:30080 --duration 90 --name e5-<step> \
+  --event-at 10 \
+  --event-cmd 'kubectl delete pod $(kubectl get pods -l app=orders-api -o jsonpath="{.items[0].metadata.name}") && kubectl rollout status deployment/orders-api --timeout=300s'
 ```
 
-**Result:**
+**Result** ([naive](results/e5-naive.txt), [production](results/e5-production.txt)):
 
-| Configuration | Failed requests when a pod is deleted | Time until replacement is Ready |
+| Configuration | Failed requests | Error types | Kubernetes reported healthy after | Replacement actually serving after |
+|---|---|---|---|---|
+| Naive | **1,450** | 915 × HTTP 503, 535 × connection refused | 2.4 s | ~25 s |
+| Production | **0** of 17,947 | none | 25.7 s | 25.7 s |
+
+_In the naive run, 507 HTTP 503s in seconds 1 to 4 are excluded: they come from the setup step, where pods were still warming up, the same missing-probe problem as in E1._
+
+**Why:** in the naive setup, a third of all requests failed for about 24 seconds. First the deleted pod was still receiving traffic after its process had exited (connection refused), then its replacement received traffic while still warming up (HTTP 503). Kubernetes declared the Deployment healthy 2.4 seconds after the deletion. In the production setup the deleted pod stopped receiving traffic before shutting down, the replacement received none until it was ready, and the two remaining pods absorbed the load. Kubernetes' own health report also became truthful: 25.7 seconds, the real time to replace the pod.
+
+### Planned next
+
+| Experiment | Question | Status |
 |---|---|---|
-| Step 1 | | |
-| Step 3 | | |
-
-### E6: Autoscaling
-
-Requires metrics-server (`kubectl top pods` must work).
-
-```bash
-make deploy STEP=3-production && make hpa
-python3 scripts/loadtest.py --url http://<node-ip>:30080 --path "/api/cpu?ms=200" --concurrency 20 --duration 300 --name e6-hpa
-kubectl get hpa orders-api -w        # another terminal
-```
-
-**Result:**
-
-| Metric | Value |
-|---|---|
-| Load start → HPA decides to scale | |
-| HPA decision → new pods Ready | |
-| Max replicas reached | |
-| p99 latency before / after scale-out | |
-| Load stops → scale-in starts | |
-
-**Break it:** remove `resources.requests` and re-apply. _What does `kubectl get hpa` show, and why?_
-
-### E7: Nginx L4 load balancer in front of the nodes
-
-Config: [`lb/nginx.conf`](lb/nginx.conf). Make one worker unreachable on port 30080 while the load test runs through Nginx.
-
-**Result:**
-
-| Setting | Failed requests when a node goes away |
-|---|---|
-| `max_fails=2 fail_timeout=10s` | |
+| E3b: Slow in-flight requests | With 2-second requests in progress when SIGTERM arrives, does graceful shutdown let them finish? | Planned |
+| E6: Autoscaling | Under a CPU spike, how long until new pods actually serve traffic? ([`k8s/hpa.yaml`](k8s/hpa.yaml) is ready) | Planned |
+| E7: Nginx L4 load balancer | When a whole node disappears, how many requests fail before the load balancer stops sending to it? ([`lb/nginx.conf`](lb/nginx.conf) is ready) | Needs a multi-node cluster |
 
 ---
 
@@ -241,6 +212,8 @@ Config: [`lb/nginx.conf`](lb/nginx.conf). Make one worker unreachable on port 30
 - **"Rolled out" is not the same as "serving".** Kubernetes reported the naive rollout complete after 3.6 seconds, while the app was still unable to answer a single request. Without a readiness probe, Kubernetes only knows the process started.
 - **Readiness probes fix new pods, not old ones.** Adding one removed every HTTP 503 and the long outage, but 100 requests still failed as old pods were killed (E2).
 - **Shutdown needs as much care as startup.** Routing updates and SIGTERM happen in parallel. A `preStop` delay plus graceful shutdown took failures from 100 to 0 out of 29,921 requests (E3).
+- **Rollback is not instant.** Rolling back took 82.5 seconds with zero errors (E4): safe, but as slow as a release, because every pod must warm up again.
+- **The same settings protect against crashes, not just releases.** Deleting a pod under load failed 1,450 requests without them and none with them (E5).
 - **Safe rollouts are slower, and that's the point.** The rollout went from 3.6 s (broken) to 76 s (zero errors), because Kubernetes now waits for each pod to be genuinely ready.
 - **Measure the measuring tool.** An uncapped load tester exhausted its own ephemeral ports and reused stale connection-tracking entries, producing errors that had nothing to do with the app. Capping the client rate removed them.
 
