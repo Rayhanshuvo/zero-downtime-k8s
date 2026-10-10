@@ -1,5 +1,9 @@
 # Zero-Downtime Deployments on Kubernetes, Measured
 
+**In plain words:** when a company releases a new version of its software, users shouldn't notice. With Kubernetes' default settings, my test service went **completely offline for 30 seconds** during a routine release, while Kubernetes reported that everything was fine. I measured exactly why, changed three settings, and got it to **zero failed requests out of 29,921**.
+
+![Successful and failed requests per second during a release, for three Kubernetes configurations](screenshots/rollout-comparison.png)
+
 > **TL;DR:** A Spring Boot service deployed to Kubernetes three ways, from a tutorial-style Deployment to a production-ready one. Each change (readiness probe, graceful shutdown, preStop hook) is tested with a rolling update under constant load, and its effect is measured in failed requests.
 
 | Configuration | Failed requests during a rolling update | What users saw |
@@ -9,8 +13,6 @@
 | + graceful shutdown & preStop | **0** of 29,921 | nothing |
 
 The naive rollout was also the one Kubernetes reported as finished fastest: `kubectl rollout status` said *successfully rolled out* after 3.6 seconds, while the service stayed completely down for the next 30.
-
-<!-- Put the rolling-update GIF here: screenshots/rollout.gif -->
 
 **Stack:** Java 21 · Spring Boot 3 · Kubernetes · Docker · Nginx (L4) · Python load tester
 
