@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import os
+import subprocess
 import threading
 import time
 import urllib.error
@@ -56,6 +57,12 @@ def main():
     ap.add_argument("--duration", type=int, default=60, help="seconds")
     ap.add_argument("--timeout", type=float, default=5.0)
     ap.add_argument("--name", default="run", help="results are saved as results/<name>.csv")
+    ap.add_argument("--rate", type=float, default=200,
+                    help="max total requests/second (0 = unlimited). Keeps the client from exhausting "
+                         "its own ephemeral ports and reusing stale conntrack entries, which would add "
+                         "errors that are not the app's fault.")
+    ap.add_argument("--event-at", type=float, default=None, help="run --event-cmd this many seconds in")
+    ap.add_argument("--event-cmd", default=None, help="shell command to run at --event-at, e.g. a rollout")
     args = ap.parse_args()
 
     target = args.url.rstrip("/") + args.path
@@ -63,9 +70,19 @@ def main():
     stop_at = start + args.duration
     lock = threading.Lock()
     rows = []  # (t_offset, ok, latency_ms, version, error)
+    events = []  # (t_offset, message), printed inline with the per-second lines
+    interval = args.concurrency / args.rate if args.rate > 0 else 0.0
 
     def worker():
+        next_at = time.time()
         while time.time() < stop_at:
+            if interval:
+                next_at += interval
+                delay = next_at - time.time()
+                if delay > 0:
+                    time.sleep(delay)
+                else:
+                    next_at = time.time()  # fell behind (e.g. a slow request): don't burst to catch up
             t0 = time.time()
             version, error = "", ""
             try:
@@ -85,11 +102,23 @@ def main():
                 # bucketed by completion time, so a second is complete once it has passed
                 rows.append((t1 - start, ok, latency, version, error))
 
+    def run_event():
+        time.sleep(max(0.0, start + args.event_at - time.time()))
+        with lock:
+            events.append((time.time() - start, f"EVENT START: {args.event_cmd}"))
+        result = subprocess.run(args.event_cmd, shell=True, capture_output=True, text=True)
+        status = "ok" if result.returncode == 0 else f"exit code {result.returncode}"
+        with lock:
+            events.append((time.time() - start, f"EVENT DONE ({status})"))
+
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(args.concurrency)]
     for t in threads:
         t.start()
+    if args.event_cmd and args.event_at is not None:
+        threading.Thread(target=run_event, daemon=True).start()
 
-    print(f"Target {target} | concurrency {args.concurrency} | {args.duration}s")
+    rate_txt = f"{args.rate:g} req/s max" if args.rate > 0 else "unlimited rate"
+    print(f"Target {target} | concurrency {args.concurrency} | {rate_txt} | {args.duration}s")
     print(f"{'sec':>4} {'ok':>6} {'err':>5}  versions / errors")
     printed = 0
     while True:
@@ -98,7 +127,11 @@ def main():
         now_sec = int(time.time() - start - 0.5)
         with lock:
             snapshot = list(rows)
+            event_snapshot = list(events)
         while printed < now_sec:
+            for t_ev, msg in event_snapshot:
+                if int(t_ev) == printed:
+                    print(f"     ==== {t_ev:.1f}s  {msg} ====", flush=True)
             sec_rows = [r for r in snapshot if int(r[0]) == printed]
             ok = sum(1 for r in sec_rows if r[1])
             err = len(sec_rows) - ok
@@ -138,6 +171,8 @@ def main():
         w.writerow(["t_offset_s", "ok", "latency_ms", "version", "error"])
         for r in rows:
             w.writerow([f"{r[0]:.3f}", int(r[1]), f"{r[2]:.1f}", r[3], r[4]])
+    for t_ev, msg in events:
+        print(f"event          : {t_ev:.1f}s {msg}")
     print(f"raw data       : {path}")
 
 
