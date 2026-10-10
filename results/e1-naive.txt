@@ -1,0 +1,170 @@
+Target http://10.61.12.60:30080/api/info | concurrency 10 | 200 req/s max | 150s
+ sec     ok   err  versions / errors
+   0      0     0  
+   1      0   111    !! HTTP 503=111 <-- ERRORS
+   2     39   150  v1=39  !! HTTP 503=150 <-- ERRORS
+   3    127    72  v1=127  !! HTTP 503=72 <-- ERRORS
+   4    200     0  v1=200
+   5    200     0  v1=200
+   6    200     0  v1=200
+   7    200     0  v1=200
+   8    200     0  v1=200
+   9    200     0  v1=200
+     ==== 10.0s  EVENT START: kubectl set env deployment/orders-api APP_VERSION=v2 && kubectl rollout status deployment/orders-api --timeout=300s ====
+  10    199     0  v1=199
+  11    153    37  v1=153  !! connection refused=32, connection reset=5 <-- ERRORS
+  12     17    13  v1=17  !! connection refused=13 <-- ERRORS
+     ==== 13.6s  EVENT DONE (ok) ====
+  13      0     0  
+  14      0     0  
+  15      0     0  
+  16      0     0  
+  17      0   165    !! timeout=10, connection refused=155 <-- ERRORS
+  18      0   196    !! connection refused=196 <-- ERRORS
+  19      0   199    !! connection refused=199 <-- ERRORS
+  20      0   199    !! connection refused=199 <-- ERRORS
+  21      0   199    !! connection refused=199 <-- ERRORS
+  22      0   200    !! connection refused=200 <-- ERRORS
+  23      0   195    !! connection refused=195 <-- ERRORS
+  24      0   200    !! connection refused=200 <-- ERRORS
+  25      0   197    !! connection refused=197 <-- ERRORS
+  26      0   121    !! connection refused=121 <-- ERRORS
+  27      0    20    !! HTTP 503=17, connection refused=3 <-- ERRORS
+  28      0    71    !! HTTP 503=71 <-- ERRORS
+  29      0   179    !! HTTP 503=179 <-- ERRORS
+  30      0   185    !! HTTP 503=185 <-- ERRORS
+  31      0   188    !! HTTP 503=188 <-- ERRORS
+  32      0   186    !! HTTP 503=186 <-- ERRORS
+  33      0   189    !! HTTP 503=189 <-- ERRORS
+  34      0   186    !! HTTP 503=186 <-- ERRORS
+  35      0   190    !! HTTP 503=190 <-- ERRORS
+  36      0   185    !! HTTP 503=185 <-- ERRORS
+  37      0   186    !! HTTP 503=186 <-- ERRORS
+  38      0   190    !! HTTP 503=190 <-- ERRORS
+  39      0   189    !! HTTP 503=189 <-- ERRORS
+  40      0   189    !! HTTP 503=189 <-- ERRORS
+  41      0   191    !! HTTP 503=191 <-- ERRORS
+  42     31   167  v2=31  !! HTTP 503=167 <-- ERRORS
+  43    177    24  v2=177  !! HTTP 503=24 <-- ERRORS
+  44    200     0  v2=200
+  45    200     0  v2=200
+  46    200     0  v2=200
+  47    200     0  v2=200
+  48    200     0  v2=200
+  49    199     0  v2=199
+  50    200     0  v2=200
+  51    201     0  v2=201
+  52    200     0  v2=200
+  53    200     0  v2=200
+  54    200     0  v2=200
+  55    200     0  v2=200
+  56    200     0  v2=200
+  57    200     0  v2=200
+  58    200     0  v2=200
+  59    200     0  v2=200
+  60    200     0  v2=200
+  61    200     0  v2=200
+  62    200     0  v2=200
+  63    200     0  v2=200
+  64    200     0  v2=200
+  65    200     0  v2=200
+  66    200     0  v2=200
+  67    199     0  v2=199
+  68    201     0  v2=201
+  69    200     0  v2=200
+  70    200     0  v2=200
+  71    200     0  v2=200
+  72    200     0  v2=200
+  73    200     0  v2=200
+  74    200     0  v2=200
+  75    200     0  v2=200
+  76    200     0  v2=200
+  77    200     0  v2=200
+  78    200     0  v2=200
+  79    200     0  v2=200
+  80    200     0  v2=200
+  81    200     0  v2=200
+  82    200     0  v2=200
+  83    200     0  v2=200
+  84    200     0  v2=200
+  85    200     0  v2=200
+  86    200     0  v2=200
+  87    200     0  v2=200
+  88    200     0  v2=200
+  89    148     0  v2=148
+  90      0     0  
+  91      0     0  
+  92      0     0  
+  93      0     0  
+  94     43     8  v2=43  !! timeout=8 <-- ERRORS
+  95    198     2  v2=198  !! timeout=2 <-- ERRORS
+  96    199     0  v2=199
+  97    201     0  v2=201
+  98    200     0  v2=200
+  99    200     0  v2=200
+ 100    200     0  v2=200
+ 101    200     0  v2=200
+ 102    200     0  v2=200
+ 103    198     0  v2=198
+ 104    202     0  v2=202
+ 105    199     0  v2=199
+ 106    199     0  v2=199
+ 107    202     0  v2=202
+ 108    200     0  v2=200
+ 109    200     0  v2=200
+ 110    200     0  v2=200
+ 111    200     0  v2=200
+ 112    200     0  v2=200
+ 113    200     0  v2=200
+ 114    200     0  v2=200
+ 115    200     0  v2=200
+ 116    200     0  v2=200
+ 117    198     0  v2=198
+ 118    201     0  v2=201
+ 119    201     0  v2=201
+ 120    200     0  v2=200
+ 121    200     0  v2=200
+ 122    200     0  v2=200
+ 123    200     0  v2=200
+ 124    200     0  v2=200
+ 125    200     0  v2=200
+ 126    200     0  v2=200
+ 127    200     0  v2=200
+ 128    200     0  v2=200
+ 129    200     0  v2=200
+ 130    200     0  v2=200
+ 131    200     0  v2=200
+ 132    199     0  v2=199
+ 133    201     0  v2=201
+ 134    200     0  v2=200
+ 135    200     0  v2=200
+ 136    199     0  v2=199
+ 137    201     0  v2=201
+ 138    200     0  v2=200
+ 139    200     0  v2=200
+ 140    200     0  v2=200
+ 141    200     0  v2=200
+ 142    200     0  v2=200
+ 143    200     0  v2=200
+ 144    200     0  v2=200
+ 145    200     0  v2=200
+ 146    199     0  v2=199
+ 147    201     0  v2=201
+ 148    200     0  v2=200
+ 149    200     0  v2=200
+ 150     10     0  v2=10
+
+=== Summary ===
+requests       : 27121
+failed         : 4979 (18.36%)
+  HTTP 503            : 3045
+  connection refused  : 1909
+  timeout             : 20
+  connection reset    : 5
+seconds w/ err : 34 (from 1s to 95s)
+latency p50    : 2 ms
+latency p99    : 10 ms
+latency max    : 87 ms
+event          : 10.0s EVENT START: kubectl set env deployment/orders-api APP_VERSION=v2 && kubectl rollout status deployment/orders-api --timeout=300s
+event          : 13.6s EVENT DONE (ok)
+raw data       : results/e1-naive.csv
