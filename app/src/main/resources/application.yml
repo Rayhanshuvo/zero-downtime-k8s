@@ -1,0 +1,31 @@
+server:
+  port: 8080
+  # GRACEFUL: on SIGTERM, stop accepting new requests and let in-flight ones finish.
+  # IMMEDIATE (Spring Boot's old default behaviour): in-flight requests are cut off.
+  # Overridden per experiment with the SERVER_SHUTDOWN env var.
+  shutdown: ${SERVER_SHUTDOWN:graceful}
+
+spring:
+  application:
+    name: orders-api
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+app:
+  version: ${APP_VERSION:v1}
+  # Seconds the app spends "warming up" after the port opens. 0 = no warm-up.
+  warmup-seconds: ${WARMUP_SECONDS:0}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true      # exposes /actuator/health/liveness and /actuator/health/readiness
+      show-details: never
+      group:
+        readiness:
+          include: readinessState,warmUp   # not ready until warm-up finishes

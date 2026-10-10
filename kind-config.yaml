@@ -1,0 +1,13 @@
+# Local 3-node cluster: 1 control plane + 2 workers.
+# Port 30080 on your machine is forwarded to the NodePort, so the load tester can use localhost.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: zdd
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30080
+    hostPort: 30080
+    protocol: TCP
+- role: worker
+- role: worker

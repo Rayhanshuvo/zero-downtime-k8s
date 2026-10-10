@@ -1,0 +1,81 @@
+# PRODUCTION deployment: the same app, configured for zero downtime.
+# Each change below is tested on its own in the README experiments.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+  labels:
+    app: orders-api
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5                # how many old ReplicaSets are kept for rollback
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                        # at most 1 extra pod during rollout
+      maxUnavailable: 0                  # never drop below 3 ready pods
+  selector:
+    matchLabels:
+      app: orders-api
+  template:
+    metadata:
+      labels:
+        app: orders-api
+    spec:
+      terminationGracePeriodSeconds: 40  # must be longer than preStop + app shutdown timeout
+      containers:
+      - name: orders-api
+        image: DOCKERHUB_USER/orders-api:1.0.0   # replaced by `make deploy STEP=3-production`
+        ports:
+        - name: http
+          containerPort: 8080
+        env:
+        - name: APP_VERSION
+          value: v1
+        - name: WARMUP_SECONDS
+          value: "15"
+        - name: SERVER_SHUTDOWN          # finish in-flight requests on SIGTERM
+          value: graceful
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
+        # E2: no traffic until the app says it can serve
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+          periodSeconds: 2
+          failureThreshold: 2
+
+        # restart only if the app is truly stuck (separate from readiness on purpose)
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+          periodSeconds: 10
+          failureThreshold: 3
+
+        # give a slow JVM start up to 60s before liveness can kill it
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+          periodSeconds: 2
+          failureThreshold: 30
+
+        # E3: Endpoints/kube-proxy remove the pod asynchronously after it starts terminating.
+        # Sleeping first lets that finish, so no new requests arrive after shutdown begins.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 10"]
+
+        # E6: HPA needs requests to compute CPU utilisation
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            memory: 384Mi

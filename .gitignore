@@ -1,0 +1,6 @@
+app/target/
+*.class
+.idea/
+*.iml
+.vscode/
+__pycache__/

@@ -1,0 +1,41 @@
+# STEP 2: naive deployment + readinessProbe only.
+# Still no graceful shutdown, so E3 can show what that adds on its own.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+  labels:
+    app: orders-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orders-api
+  template:
+    metadata:
+      labels:
+        app: orders-api
+    spec:
+      containers:
+      - name: orders-api
+        image: DOCKERHUB_USER/orders-api:1.0.0   # replaced by `make deploy STEP=2-readiness`
+        ports:
+        - name: http
+          containerPort: 8080
+        env:
+        - name: APP_VERSION
+          value: v1
+        - name: WARMUP_SECONDS          # app needs 15s after start before it can serve
+          value: "15"
+        - name: SERVER_SHUTDOWN         # in-flight requests are cut off on SIGTERM
+          value: immediate
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+          periodSeconds: 2
+          failureThreshold: 2

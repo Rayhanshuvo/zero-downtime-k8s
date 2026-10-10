@@ -1,0 +1,21 @@
+# E6: scale between 3 and 5 pods, targeting 60% of the requested CPU (200m).
+# maxReplicas is kept low so all pods fit on a small single-node lab cluster.
+# Requires metrics-server in the cluster (`kubectl top pods` must work).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orders-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orders-api
+  minReplicas: 3
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60

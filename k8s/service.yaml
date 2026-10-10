@@ -1,0 +1,13 @@
+# NodePort so the load tester (and the Nginx L4 LB in E7) can reach the pods from outside.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-api
+spec:
+  type: NodePort
+  selector:
+    app: orders-api
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30080
