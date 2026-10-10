@@ -18,8 +18,25 @@ STEP           ?= 3-production
 NODE           ?= 127.0.0.1
 NAME           ?= run
 DURATION       ?= 90
+EXP_DURATION   ?= 150
+LOADARGS       ?=
 
-.PHONY: cluster cluster-delete kind-load k3s-load metrics-server build push deploy rollout-v2 rollout-v1 undo history kill-pod watch hpa load clean
+.PHONY: experiment cluster cluster-delete kind-load k3s-load metrics-server build push deploy rollout-v2 rollout-v1 undo history kill-pod watch hpa load clean
+
+experiment:       ## ONE command per experiment: STEP=<step> NAME=<name> NODE=<ip> [LOADARGS=...]
+	@echo ">>> 1/3 deploying $(STEP) with v1"
+	sed "s|DOCKERHUB_USER|$(DOCKERHUB_USER)|" k8s/$(STEP)/deployment.yaml | kubectl apply -f -
+	kubectl apply -f k8s/service.yaml
+	# apply alone won't undo a previous `set env` (three-way merge), so reset v1 explicitly
+	kubectl set env deployment/orders-api APP_VERSION=v1
+	kubectl rollout status deployment/orders-api --timeout=300s
+	@echo ">>> 2/3 waiting 25s so every pod has finished warming up"
+	sleep 25
+	@echo ">>> 3/3 load test for $(EXP_DURATION)s; rollout to v2 starts automatically at 10s"
+	python3 scripts/loadtest.py --url http://$(NODE):30080 --duration $(EXP_DURATION) --name $(NAME) $(LOADARGS) \
+	  --event-at 10 \
+	  --event-cmd "kubectl set env deployment/orders-api APP_VERSION=v2 && kubectl rollout status deployment/orders-api --timeout=300s" \
+	  | tee results/$(NAME).txt
 
 cluster:          ## create a local 3-node kind cluster
 	kind create cluster --config kind-config.yaml
