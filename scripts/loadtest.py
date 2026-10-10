@@ -35,6 +35,8 @@ def classify(exc):
         return "timeout"
     if type(reason).__name__ == "RemoteDisconnected":
         return "connection closed"
+    if isinstance(reason, OSError) and reason.strerror:
+        return f"OSError: {reason.strerror}"
     return type(reason).__name__
 
 
@@ -77,9 +79,11 @@ def main():
             except Exception as exc:  # noqa: BLE001 - every failure is a data point
                 ok, error = False, classify(exc)
                 time.sleep(0.05)  # avoid a hot loop when the target is down
-            latency = (time.time() - t0) * 1000
+            t1 = time.time()
+            latency = (t1 - t0) * 1000
             with lock:
-                rows.append((t0 - start, ok, latency, version, error))
+                # bucketed by completion time, so a second is complete once it has passed
+                rows.append((t1 - start, ok, latency, version, error))
 
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(args.concurrency)]
     for t in threads:
@@ -88,9 +92,10 @@ def main():
     print(f"Target {target} | concurrency {args.concurrency} | {args.duration}s")
     print(f"{'sec':>4} {'ok':>6} {'err':>5}  versions / errors")
     printed = 0
-    while time.time() < stop_at or any(t.is_alive() for t in threads):
+    while True:
         time.sleep(1)
-        now_sec = int(time.time() - start)
+        # print a second only after it has fully passed (plus a margin for in-flight requests)
+        now_sec = int(time.time() - start - 0.5)
         with lock:
             snapshot = list(rows)
         while printed < now_sec:
@@ -105,8 +110,10 @@ def main():
             marker = " <-- ERRORS" if err else ""
             print(f"{printed:>4} {ok:>6} {err:>5}  {detail}{marker}", flush=True)
             printed += 1
-        if printed >= args.duration and not any(t.is_alive() for t in threads):
-            break
+        if not any(t.is_alive() for t in threads):
+            last = int(max((r[0] for r in rows), default=0))
+            if printed > last:
+                break
 
     total = len(rows)
     failed = [r for r in rows if not r[1]]
